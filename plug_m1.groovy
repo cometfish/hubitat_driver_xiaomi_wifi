@@ -11,9 +11,14 @@ metadata {
         capability "Actuator"
         capability "Switch"
         capability "Sensor"
-		capability "TemperatureMeasurement"
+		capability "Outlet"
+		//capability "TemperatureMeasurement"
 		
-		attribute "temperature", "number"
+		//attribute "temperature", "number"
+		attribute "switch", "enum", ["off", "on"] 
+		
+		command "on" 
+		command "off" 
 		
 		command "refresh"
     }
