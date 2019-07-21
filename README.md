@@ -5,6 +5,8 @@ Requires RPi set up to do the AES-128-CBC encrypt/decrypt.
 
 Tested on _chuangmi.plug.m1_ only.
 
+Note: Unfortunately the plug eventually stops responding to commands until you physically cycle the power to it. Others are reporting this issue too, so it appears to be a fault with the plug itself, not this driver: https://xiaomi.eu/community/threads/mi-plug-mini-socket-wifi-communication-problems.47985/
+
 1. Add `plug_m1.groovy` to your Hubitat as a new Driver (under `Drivers Code`)
 2. Add a new device for your WiFi Socket to your Hubitat, set device Type to your User driver of 'Xiaomi WiFi Socket'
 3. Assign your plug a static IP, and enter the IP into the device's `IP Address` setting in Hubitat.
