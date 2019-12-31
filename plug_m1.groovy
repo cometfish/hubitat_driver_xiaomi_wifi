@@ -2,7 +2,6 @@
  * Xiaomi WiFi Socket driver (chuangmi.plug.m1)
  *
  * Controls the original Xiaomi WiFi socket directly via local commands (no hub or cloud needed)
- * Requires RPi set up to do the AES-128-CBC encrypt/decrypt (see included bash script)
  * 
  */
 
@@ -18,7 +17,7 @@ metadata {
 		attribute "switch", "enum", ["off", "on"] 
 		
 		command "on" 
-		command "off" 
+		command "off"
 		
 		command "refresh"
     }
@@ -28,12 +27,14 @@ preferences {
     section("URIs") {
         input "ipAddress", "text", title: "IP Address", required: true
 		input "token", "text", title: "Device Token (optional if device is uninitialised)", required: false
-		input "aesIP", "text", title: "AES script IP", required: true
         input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
     }
 }
 
 import java.security.MessageDigest
+import javax.crypto.spec.IvParameterSpec 
+import javax.crypto.spec.SecretKeySpec
+import javax.crypto.Cipher
 
 def updated() {
 	if (settings.token!="") {
@@ -195,10 +196,42 @@ def connect(callbackFunc) {
 }
 
 def aesEncrypt(val) {
-	return aes("encrypt", val)
+	key = getKey();
+    iv = hubitat.helper.HexUtils.hexStringToByteArray(getIV(key));
+    
+    if (logEnable)
+        log.info 'token: '+state.token + ' key: ' + key + ' iv: ' + iv
+
+    IvParameterSpec iv1 = new IvParameterSpec(iv);
+    SecretKeySpec skeySpec = new SecretKeySpec(hubitat.helper.HexUtils.hexStringToByteArray(key), "AES");
+
+    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
+    cipher.init(Cipher.ENCRYPT_MODE, skeySpec, iv1);
+
+    byte[] encrypted = cipher.doFinal((val+"\0").getBytes());
+    result = hubitat.helper.HexUtils.byteArrayToHexString(encrypted).toLowerCase();
+    if (logEnable)
+        log.info result
+    return result;
 }
 def aesDecrypt(val) {
-	return aes("decrypt", val)
+	key = getKey();
+    iv = hubitat.helper.HexUtils.hexStringToByteArray(getIV(key));
+    
+    if (logEnable)
+        log.info 'token: '+state.token + ' key: ' + key + ' iv: ' + iv
+
+    IvParameterSpec iv1 = new IvParameterSpec(iv);
+    SecretKeySpec skeySpec = new SecretKeySpec(hubitat.helper.HexUtils.hexStringToByteArray(key), "AES");
+
+    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
+    cipher.init(Cipher.DECRYPT_MODE, skeySpec, iv1);
+    byte[] original = cipher.doFinal(hubitat.helper.HexUtils.hexStringToByteArray(val));
+
+    result = new String(original);
+    if (logEnable)
+        log.info result
+    return result;
 }
 def getKey() {
 	return md5(hubitat.helper.HexUtils.hexStringToByteArray(state.token))
@@ -206,32 +239,6 @@ def getKey() {
 def getIV(key) {
 	return md5(hubitat.helper.HexUtils.hexStringToByteArray(key + state.token))
 }
-def aes(mode, val) {
-	try {
-		key = getKey()
-		
-		iv = getIV(key)
-		if (logEnable) log.info 'token: '+state.token + ' key: ' + key + ' iv: ' + iv
-		
-		def url = "http://" + settings.aesIP + "/cgi-bin/aes.cgi?mode=" + mode + "&key=" + key + "&iv=" + iv + "&val=" + java.net.URLEncoder.encode(val, "UTF-8") 
-		
-		if (logEnable) log.debug url
-		x=""
-
-        httpGet(["uri":url]) { resp ->
-		    if (resp.success) {
-				if (logEnable) log.debug 'result from rpi: ' +resp.data
-				x = resp.data.toString()
-				if (mode=='encrypt')
-					x = x.replace("\r","").replace("\n","")
-			}
-		}
-		return x
-    } catch (Exception ex) {
-        log.error ex.message
-		return ""
-    }
-} 
 def md5(s){
 	MessageDigest.getInstance("MD5").digest(s).encodeHex().toString()
 }
